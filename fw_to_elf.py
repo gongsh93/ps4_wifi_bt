@@ -9,10 +9,10 @@ import zipfile
 
 
 def write_sections_to_elf_file(elfFilename, sections):
-	print "writing %d sections to %s" % (len(sections), elfFilename)
+	print("writing %d sections to %s" % (len(sections), elfFilename))
 	for section in sections:
-		print "%08X  %08X" % (section[0], len(section[1]))
-	print ""
+		print("%08X  %08X" % (section[0], len(section[1])))
+	print("")
 	
 	with open(elfFilename, "w+b") as elf_fd:
 		# create and write elf header
@@ -58,19 +58,19 @@ def write_sections_to_elf_file(elfFilename, sections):
 		
 		# now write out data for program segments
 		for section in sections:
-			elf_fd.write("" + section[1])
+			elf_fd.write(section[1])
 
 
 def title():
-	print "FW to ELF file convertor for ps4 torus fws"
+	print("FW to ELF file convertor for ps4 torus fws")
 	
 def usage():
-	print "Usage:   fw_to_elf.py <fw filename> <elf filename> [elf filename 2]"
-	print ""
-	print "Example: fw_to_elf.py C0020001 torus1_fw.elf"
-	print "         fw_to_elf.py C0020001 torus2a_fw.elf torus2b_fw.elf"
-	print ""
-	print "Note:    torus2 fws require 2 output elf filenames, torus1 fws only require 1"
+	print("Usage:   fw_to_elf.py <fw filename> <elf filename> [elf filename 2]")
+	print("")
+	print("Example: fw_to_elf.py C0020001 torus1_fw.elf")
+	print("         fw_to_elf.py C0020001 torus2a_fw.elf torus2b_fw.elf")
+	print("")
+	print("Note:    torus2 fws require 2 output elf filenames, torus1 fws only require 1")
 
 
 def main(argv):
@@ -78,6 +78,12 @@ def main(argv):
 	if len(argv) < 3 or len(argv) > 4:
 		usage()
 		return
+	
+	print(f"argv:")
+	arg_cnt = 0
+	for arg in argv:
+		print(f"\t{arg_cnt}: {arg}")
+		arg_cnt += 1
 	
 	fw_filename = argv[1]
 	elf_filename = argv[2]
@@ -92,16 +98,24 @@ def main(argv):
 	
 	# if fw data is zipped, then unzip it
 	# torus2 fw is zipped, torus1 fw is not
-	magic = struct.unpack("<I", fw_data[0x00:0x04])[0]
-	if magic == 0x04034B50:
-		# torus2 fw requires 2 elf filenames
-		if len(argv) < 4:
-			usage()
-			return
-		fw_name_len = struct.unpack("<H", fw_data[0x1A:0x1C])[0]
-		fw_name = fw_data[0x1E:0x1E+fw_name_len]
-		with zipfile.ZipFile(fw_filename, "r") as myzip:
-			fw_data = myzip.read(fw_name)
+
+	###########################################################################
+	# GONG: zip file-related code
+	# magic = struct.unpack("<I", fw_data[0x00:0x04])[0]
+	# if magic == 0x04034B50:
+
+	# magic = struct.unpack(">I", fw_data[0x00:0x04])[0]
+	# if magic == 0x504B0304:
+	# 	# torus2 fw requires 2 elf filenames
+	# 	if len(argv) < 4:
+	# 		usage()
+	# 		return
+	# 	fw_name_len = struct.unpack("<H", fw_data[0x1A:0x1C])[0]
+	# 	print(f"fw_name_len : {fw_name_len}, {fw_data[0x1A:0x1C]}")
+	# 	fw_name = fw_data[0x1E:0x1E+fw_name_len]
+	# 	with zipfile.ZipFile(fw_filename, "r") as myzip:
+	# 		fw_data = myzip.read(fw_name)
+	###########################################################################
 	
 	# generate a list of entries where each entry has load address and data
 	sections = []
@@ -111,8 +125,10 @@ def main(argv):
 	type6_idx = -1
 	while fw_off < len(fw_data):
 		(type, load_addr, load_size, checksum) = struct.unpack("<IIII", fw_data[fw_off:fw_off+0x10])
+		# print(f"{type}, {load_addr}, {load_size}, {checksum}")
 		if type==4:
 			# end of file
+			print(f"END OF FILE.")
 			break
 		elif type==1:
 			# normal entry
@@ -120,7 +136,7 @@ def main(argv):
 			if load_addr != last_load_addr+last_load_size-4:
 #				print "new section: %08X" % (load_addr)
 				sections.append( [load_addr, ""] )
-			sections[len(sections)-1][1] += fw_data[fw_off+0x10:fw_off+0x10+load_size-4]
+			sections[len(sections)-1][1] += str(fw_data[fw_off+0x10:fw_off+0x10+load_size-4])
 			last_load_addr = load_addr
 			last_load_size = load_size
 			fw_off += 0x10 + last_load_size
@@ -128,16 +144,16 @@ def main(argv):
 			# 6 = end of bluetooth image / start of wifi image
 			# entry that is just a header - has size and address of 0
 			# this seems to "split" the fw into 2 parts (but why?)
-			print "split at idx %d offset 0x%X" % (len(sections), fw_off)
-			print "(%X %X %X %X)" % (type, load_addr, load_size, checksum)
-			print ""
+			print("split at idx %d offset 0x%X" % (len(sections), fw_off))
+			print("(%X %X %X %X)" % (type, load_addr, load_size, checksum))
+			print("")
 			type6_idx = len(sections)
 			fw_off += 0x10
 		else:
-			print "unknown type at idx %d offset 0x%X" % (len(sections), fw_off)
-			print "%x %X %X %X" % (type, load_addr, load_size, checksum)
+			print("unknown type at idx %d offset 0x%X" % (len(sections), fw_off))
+			print("%x %X %X %X" % (type, load_addr, load_size, checksum))
 			fw_off += 0x10
-			print "STOPPING"
+			print("STOPPING")
 			break
 	
 	# if fw had a "split" signified by a type6
@@ -156,9 +172,8 @@ def main(argv):
 	if len(sections2) > 0:
 		write_sections_to_elf_file(elf2_filename, sections2)
 	
-	print "done"
+	print("done")
 
 
 if __name__ == "__main__":
 	main(sys.argv)
-

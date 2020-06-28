@@ -5,6 +5,11 @@ xorloser
 march 2018
 
 
+v1.1
+gongsh93
+June 2020
+
+
 <br>
 
 ## Overview
